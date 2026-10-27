@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code Shelf</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #fbfbfd;
+    --panel: #ffffff;
+    --ink: #1a1d24;
+    --ink-soft: #5a616e;
+    --line: #e4e6ec;
+    --line-strong: #cfd3dc;
+    --accent: #4f6bed;
+    --accent-ink: #ffffff;
+    --ok: #1a8f5a;
+    --ok-bg: #e7f6ee;
+    --warn: #b06a00;
+    --warn-bg: #fbf0da;
+    --danger: #c5362f;
+    --field: #f3f4f8;
+    --sel: rgba(79,107,237,0.26);
+    --t-com: #6b7280;
+    --t-str: #137a3b;
+    --t-num: #a2560a;
+    --t-kw:  #6f42c1;
+    --t-bool:#0550ae;
+    --t-tag: #0550ae;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #14161b;
+      --panel: #1b1e25;
+      --ink: #e8eaf0;
+      --ink-soft: #9aa2b1;
+      --line: #2a2e38;
+      --line-strong: #3a3f4c;
+      --accent: #6f86f3;
+      --accent-ink: #0d0f14;
+      --ok: #51c98a;
+      --ok-bg: #16281f;
+      --warn: #e0a03a;
+      --warn-bg: #2a2212;
+      --danger: #f0756d;
+      --field: #23272f;
+      --sel: rgba(111,134,243,0.32);
+      --t-com: #8b94a3;
+      --t-str: #7ee787;
+      --t-num: #e3a66b;
+      --t-kw:  #d2a8ff;
+      --t-bool:#79c0ff;
+      --t-tag: #79c0ff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  }
+
+  /* Top toolbar (gist / sync) */
+  .bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 16px; border-bottom: 1px solid var(--line);
+    background: var(--panel); flex-wrap: wrap;
+  }
+  .brand { font-weight: 650; letter-spacing: -0.01em; font-size: 15px; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-soft);
+    background: var(--field); border: 1px solid var(--line);
+    padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  }
+  .status { font-size: 12.5px; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; min-height: 20px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); flex: none; }
+  .dot.dirty { background: var(--warn); }
+  .dot.saved { background: var(--ok); }
+  .spacer { flex: 1 1 auto; }
+
+  button {
+    font-family: var(--sans); font-size: 13px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line-strong);
+    padding: 7px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 7px 16px; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.05); }
+  button.primary.is-saved { background: var(--ok); border-color: var(--ok); }
+  button.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
+  button.ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+  button.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+
+  /* Panels */
+  .panel { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: none; }
+  .panel.open { display: block; }
+  .panel h2 { margin: 0 0 4px; font-size: 14px; font-weight: 650; }
+  .panel p { margin: 0 0 10px; color: var(--ink-soft); font-size: 12.5px; max-width: 72ch; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text], input[type=password] {
+    font-family: var(--mono); font-size: 13px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line-strong);
+    padding: 8px 10px; border-radius: 7px; min-width: 280px; flex: 1 1 280px;
+  }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  a { color: var(--accent); }
+  .hint { font-size: 11.5px; color: var(--ink-soft); }
+
+  /* File tabs */
+  .tabrow { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .file-search {
+    flex: 0 0 auto; width: 160px; align-self: center;
+    margin: 6px 4px 6px 12px; min-width: 0;
+    font-family: var(--sans); font-size: 12.5px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line-strong);
+    border-radius: 7px; padding: 5px 9px;
+  }
+  .file-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .file-search::placeholder { color: var(--ink-soft); }
+  .tabs {
+    flex: 1 1 auto; display: flex; align-items: stretch; gap: 2px; padding: 0 10px;
+    background: var(--bg); overflow-x: auto;
+  }
+  .tab-empty { font-size: 12.5px; color: var(--ink-soft); padding: 11px 6px; white-space: nowrap; }
+  .tab {
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft);
+    background: transparent; border: none; border-bottom: 2px solid transparent;
+    padding: 10px 12px; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px; border-radius: 0;
+  }
+  .tab:hover { color: var(--ink); border-bottom-color: var(--line-strong); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab .mark { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); flex: none; visibility: hidden; }
+  .tab.dirty .mark { visibility: visible; }
+  .tab .big { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); }
+  .tab-add { font-family: var(--sans); color: var(--ink-soft); background: transparent; border: none; padding: 10px 12px; cursor: pointer; border-radius: 0; }
+  .tab-add:hover { color: var(--accent); }
+
+  /* Sub toolbar (editor controls) */
+  .subbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .ctl { font-size: 12.5px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
+  .ctl input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+  select {
+    font-family: var(--sans); font-size: 12.5px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line-strong);
+    border-radius: 6px; padding: 5px 7px;
+  }
+  select:disabled { opacity: 0.45; }
+  select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .sub-spacer { flex: 1 1 auto; }
+  .subbar button { padding: 6px 11px; font-size: 12.5px; }
+
+  /* Banner */
+  .banner { padding: 9px 16px; font-size: 12.5px; border-bottom: 1px solid var(--line); display: none; }
+  .banner.open { display: block; }
+  .banner.info { background: var(--field); color: var(--ink-soft); }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+
+  /* Editor: transparent textarea over a highlighted <pre> */
+  .edit-wrap { flex: 1 1 auto; display: flex; min-height: 0; }
+  .code { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .code > pre, .code > textarea {
+    position: absolute; inset: 0; margin: 0; border: 0;
+    padding: 16px; font-family: var(--mono); font-size: 13.5px; line-height: 1.6;
+    tab-size: 2; white-space: pre; word-wrap: normal;
+  }
+  .code.wrap > pre, .code.wrap > textarea { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .code > pre {
+    overflow: auto; pointer-events: none; color: var(--ink); background: var(--bg);
+  }
+  .code > pre code { font: inherit; }
+  .code > textarea {
+    overflow: auto; resize: none; color: transparent; background: transparent;
+    caret-color: var(--ink); -webkit-text-fill-color: transparent;
+  }
+  .code > textarea::selection { background: var(--sel); }
+  .code > textarea::-moz-selection { background: var(--sel); }
+  .code > textarea::placeholder { color: var(--ink-soft); -webkit-text-fill-color: var(--ink-soft); }
+  .code > textarea:focus-visible { outline: none; }
+
+  .t-com { color: var(--t-com); font-style: italic; }
+  .t-str { color: var(--t-str); }
+  .t-num { color: var(--t-num); }
+  .t-kw  { color: var(--t-kw); }
+  .t-bool{ color: var(--t-bool); }
+  .t-tag { color: var(--t-tag); }
+  kbd { font-family: var(--mono); font-size: 11px; background: var(--field); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+
+  <div class="bar">
+    <div class="brand">Code&nbsp;<span>Shelf</span></div>
+    <div class="chip" id="gistChip">no gist</div>
+    <div class="status"><span class="dot" id="stateDot"></span><span id="stateText">Not loaded</span></div>
+    <div class="spacer"></div>
+    <button id="reloadBtn" title="Fetch the latest version">Reload</button>
+    <button id="saveBtn" class="primary" disabled>Save</button>
+    <button id="tokenBtn" class="ghost">Token</button>
+  </div>
+
+  <div class="banner info" id="banner"></div>
+
+  <div class="panel" id="setupPanel">
+    <h2>Point this at a gist</h2>
+    <p>Create a <strong>secret gist</strong> at gist.github.com (it holds your code), then paste its ID or full URL here. It's remembered on this device and added to the page URL, so the link itself carries it to your other laptop.</p>
+    <div class="row">
+      <input type="text" id="gistInput" placeholder="e.g. 3f2a… or https://gist.github.com/you/3f2a…" autocomplete="off" spellcheck="false">
+      <button class="primary" id="gistSave">Use this gist</button>
+    </div>
+  </div>
+
+  <div class="panel" id="tokenPanel">
+    <h2>Edit access on this device</h2>
+    <p>Viewing needs nothing. To <em>save</em>, paste a GitHub token with only the <strong>gist</strong> scope — it can touch your gists and nothing else (no repos, no account). It's stored only in this browser. On a work laptop, set an expiry and use <em>Forget</em> when you're done.</p>
+    <div class="row">
+      <input type="password" id="tokenInput" placeholder="ghp_… (gist scope only)" autocomplete="off" spellcheck="false">
+      <button class="primary" id="tokenSave">Save token</button>
+      <button id="tokenForget">Forget</button>
+    </div>
+    <p class="hint" style="margin-top:10px">Make one at github.com → Settings → Developer settings → Personal access tokens. Classic token, tick only <strong>gist</strong>.</p>
+  </div>
+
+  <div class="tabrow">
+    <input type="text" id="fileSearch" class="file-search" placeholder="Filter files…" autocomplete="off" spellcheck="false">
+    <div class="tabs" id="tabs"></div>
+  </div>
+
+  <div class="subbar">
+    <label class="ctl">Language
+      <select id="langSelect">
+        <option value="plain">Plain</option>
+        <option value="html">HTML</option>
+        <option value="css">CSS</option>
+        <option value="javascript">JavaScript</option>
+        <option value="json">JSON</option>
+        <option value="java">Java</option>
+        <option value="python">Python</option>
+      </select>
+    </label>
+    <label class="ctl">Indent
+      <select id="indentSelect">
+        <option value="2">2 spaces</option>
+        <option value="4">4 spaces</option>
+        <option value="8">8 spaces</option>
+      </select>
+    </label>
+    <label class="ctl"><input type="checkbox" id="wrapToggle"> Soft wrap</label>
+    <span class="sub-spacer"></span>
+    <button id="copyBtn" disabled>Copy raw</button>
+    <button id="downloadBtn" disabled>Download</button>
+    <button id="renameBtn" disabled>Rename</button>
+    <button id="deleteBtn" class="danger" disabled>Delete</button>
+  </div>
+
+  <div class="edit-wrap">
+    <div class="code" id="code">
+      <pre id="hl" aria-hidden="true"><code id="hlCode"></code></pre>
+      <textarea id="editor" spellcheck="false" placeholder="Nothing loaded yet." readonly></textarea>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var API = "https://api.github.com";
+  var LS_TOKEN = "codeshelf_token";
+  var LS_GIST = "codeshelf_gist";
+  var LS_WRAP = "codeshelf_wrap";
+  var LS_INDENT = "codeshelf_indent";
+
+  // ---------- syntax highlighting (self-contained) ----------
+  function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  var JS = [
+    [/\/\*[\s\S]*?\*\//y,"t-com"],
+    [/\/\/[^\n]*/y,"t-com"],
+    [/`(?:\\.|[^`\\])*`/y,"t-str"],
+    [/"(?:\\.|[^"\\])*"/y,"t-str"],
+    [/'(?:\\.|[^'\\])*'/y,"t-str"],
+    [/0[xX][0-9a-fA-F]+|0[bB][01]+|\b\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y,"t-num"],
+    [/\b(?:true|false|null|undefined|NaN|Infinity)\b/y,"t-bool"],
+    [/\b(?:abstract|async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|from|function|get|if|implements|import|in|instanceof|interface|let|new|of|private|protected|public|return|set|static|super|switch|this|throw|try|typeof|var|void|while|with|yield)\b/y,"t-kw"],
+    [/[A-Za-z_$][\w$]*/y,null]
+  ];
+  var JAVA = [
+    [/\/\*[\s\S]*?\*\//y,"t-com"],
+    [/\/\/[^\n]*/y,"t-com"],
+    [/"""[\s\S]*?"""/y,"t-str"],
+    [/"(?:\\.|[^"\\])*"/y,"t-str"],
+    [/'(?:\\.|[^'\\])*'/y,"t-str"],
+    [/0[xX][0-9a-fA-F_]+[lL]?|\b\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?[fFdDlL]?\b/y,"t-num"],
+    [/\b(?:true|false|null)\b/y,"t-bool"],
+    [/\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|record|return|sealed|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|var|void|volatile|while|yield)\b/y,"t-kw"],
+    [/[A-Za-z_$][\w$]*/y,null]
+  ];
+  var PY = [
+    [/#[^\n]*/y,"t-com"],
+    [/[rRbBuUfF]{0,2}"""[\s\S]*?"""/y,"t-str"],
+    [/[rRbBuUfF]{0,2}'''[\s\S]*?'''/y,"t-str"],
+    [/[rRbBuUfF]{0,2}"(?:\\.|[^"\\\n])*"/y,"t-str"],
+    [/[rRbBuUfF]{0,2}'(?:\\.|[^'\\\n])*'/y,"t-str"],
+    [/0[xX][0-9a-fA-F_]+|\b\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?[jJ]?\b/y,"t-num"],
+    [/\b(?:True|False|None)\b/y,"t-bool"],
+    [/\b(?:and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|match|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b/y,"t-kw"],
+    [/[A-Za-z_][\w]*/y,null]
+  ];
+  var JSONL = [
+    [/"(?:\\.|[^"\\])*"/y,"t-str"],
+    [/-?\b\d[\d]*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/y,"t-num"],
+    [/\b(?:true|false|null)\b/y,"t-bool"]
+  ];
+  var CSS = [
+    [/\/\*[\s\S]*?\*\//y,"t-com"],
+    [/"(?:\\.|[^"\\])*"/y,"t-str"],
+    [/'(?:\\.|[^'\\])*'/y,"t-str"],
+    [/#[0-9a-fA-F]{3,8}\b/y,"t-num"],
+    [/@[\w-]+/y,"t-kw"],
+    [/!important\b/y,"t-kw"],
+    [/-?\b\d[\d.]*(?:px|em|rem|%|vh|vw|vmin|vmax|fr|deg|rad|turn|ms|s|pt|pc|ex|ch|cm|mm|in)?\b/y,"t-num"],
+    [/[A-Za-z_-][\w-]*/y,null]
+  ];
+  var HTML = [
+    [/<!--[\s\S]*?-->/y,"t-com"],
+    [/<![^>]*>/iy,"t-com"],
+    [/<\/?[A-Za-z][\w:-]*/y,"t-tag"],
+    [/"[^"]*"|'[^']*'/y,"t-str"],
+    [/\/?>/y,"t-tag"]
+  ];
+  var LANGS = { html:HTML, css:CSS, javascript:JS, json:JSONL, java:JAVA, python:PY };
+
+  function tokenize(code, rules){
+    if (code.length > 60000) return esc(code);   // keep large files responsive
+    var out = "", i = 0, n = code.length;
+    outer: while (i < n) {
+      for (var r = 0; r < rules.length; r++) {
+        var re = rules[r][0]; re.lastIndex = i;
+        var m = re.exec(code);
+        if (m && m[0].length) {
+          if (rules[r][1]) out += '<span class="' + rules[r][1] + '">' + esc(m[0]) + "</span>";
+          else out += esc(m[0]);
+          i += m[0].length;
+          continue outer;
+        }
+      }
+      out += esc(code[i]); i++;
+    }
+    return out;
+  }
+  function highlight(code, lang){
+    var rules = LANGS[lang];
+    return rules ? tokenize(code, rules) : esc(code);
+  }
+  function detectLang(name){
+    var ext = (name.split(".").pop() || "").toLowerCase();
+    var map = { html:"html", htm:"html", xml:"html", svg:"html", css:"css",
+      js:"javascript", mjs:"javascript", cjs:"javascript", jsx:"javascript", ts:"javascript", tsx:"javascript",
+      json:"json", java:"java", py:"python", pyw:"python" };
+    return map[ext] || "plain";
+  }
+
+  // ---------- state ----------
+  var token = localStorage.getItem(LS_TOKEN) || "";
+  var gistId = "";
+  var files = {};        // name -> { content, truncated, dirty, origName, lang }
+  var order = [];        // filenames in display order
+  var deleted = [];      // server filenames removed, pending save
+  var active = null;
+  var loadedUpdatedAt = null;
+  var tabEls = {};
+  var searchQuery = "";
+
+  // ---------- elements ----------
+  var el = {};
+  ["gistChip","stateDot","stateText","reloadBtn","saveBtn","tokenBtn","banner","setupPanel",
+   "gistInput","gistSave","tokenPanel","tokenInput","tokenSave","tokenForget","tabs",
+   "langSelect","indentSelect","wrapToggle","copyBtn","downloadBtn","renameBtn","deleteBtn",
+   "fileSearch","code","hl","hlCode","editor"].forEach(function(id){ el[id] = document.getElementById(id); });
+
+  // ---------- helpers ----------
+  function headers(extra){
+    var h = { "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" };
+    if (token) h["Authorization"] = "Bearer " + token;
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+  function showBanner(kind, msg){ el.banner.className = "banner " + kind + " open"; el.banner.textContent = msg; }
+  function hideBanner(){ el.banner.className = "banner"; }
+  function anyDirty(){ return deleted.length > 0 || order.some(function(n){ return files[n] && files[n].dirty; }); }
+
+  function parseGistId(raw){
+    raw = (raw || "").trim();
+    if (!raw) return "";
+    var m = raw.match(/[0-9a-fA-F]{6,}$/);
+    if (m) return m[0];
+    var parts = raw.replace(/\/+$/, "").split("/");
+    return parts[parts.length - 1];
+  }
+  function setUrlGist(id){
+    try { var u = new URL(window.location.href); u.searchParams.set("gist", id); history.replaceState(null, "", u.toString()); }
+    catch (e) {}
+  }
+
+  // language overrides (per gist, so a correction sticks across reloads)
+  function langKey(){ return "codeshelf_lang_" + gistId; }
+  function loadOverrides(){ try { return JSON.parse(localStorage.getItem(langKey()) || "{}"); } catch(e){ return {}; } }
+  function saveOverrides(o){ localStorage.setItem(langKey(), JSON.stringify(o)); }
+  function pickLang(name){ var o = loadOverrides(); return o[name] || detectLang(name); }
+
+  function getIndent(){ return parseInt(localStorage.getItem(LS_INDENT), 10) || 2; }
+  function wrapOn(){ return localStorage.getItem(LS_WRAP) === "1"; }
+  function applyEditorPrefs(){
+    var ind = getIndent();
+    el.hl.style.tabSize = ind; el.editor.style.tabSize = ind;
+    el.code.classList.toggle("wrap", wrapOn());
+  }
+
+  // ---------- rendering ----------
+  function render(){
+    var canEdit = !!token;
+
+    el.gistChip.textContent = gistId ? gistId.slice(0,8) + "…" : "no gist";
+    el.setupPanel.classList.toggle("open", !gistId);
+    el.reloadBtn.disabled = !gistId;
+
+    var dot = el.stateDot, txt = el.stateText;
+    dot.className = "dot";
+    if (!gistId) txt.textContent = "Add a gist to begin";
+    else if (loadedUpdatedAt == null) txt.textContent = "Loading…";
+    else if (anyDirty()) { dot.className = "dot dirty"; txt.textContent = "Unsaved changes"; }
+    else { dot.className = "dot saved"; txt.textContent = "Saved · gist updated " + new Date(loadedUpdatedAt).toLocaleString(); }
+
+    el.saveBtn.style.display = canEdit ? "" : "none";
+    el.saveBtn.disabled = !(canEdit && anyDirty());
+    el.saveBtn.className = "primary";
+    el.saveBtn.textContent = "Save";
+
+    if (gistId && !canEdit) showBanner("info", "View only on this device. Add a gist-scoped token to edit.");
+
+    // editor controls
+    var hasActive = !!(active && files[active]);
+    el.langSelect.disabled = !hasActive;
+    el.langSelect.value = hasActive ? files[active].lang : "plain";
+    el.copyBtn.disabled = !hasActive;
+    el.downloadBtn.disabled = !hasActive;
+    el.renameBtn.disabled = !(hasActive && canEdit);
+    el.deleteBtn.disabled = !(hasActive && canEdit && order.length > 1);
+
+    renderTabs(canEdit);
+    renderEditor(canEdit);
+  }
+
+  function renderTabs(canEdit){
+    el.tabs.innerHTML = ""; tabEls = {};
+    var q = searchQuery.trim().toLowerCase();
+    var shown = 0;
+    order.forEach(function(name){
+      var f = files[name];
+      if (q && name.toLowerCase().indexOf(q) < 0 && f.content.toLowerCase().indexOf(q) < 0) return;
+      shown++;
+      var b = document.createElement("button");
+      b.className = "tab" + (name === active ? " active" : "") + (f.dirty ? " dirty" : "");
+      var mark = document.createElement("span"); mark.className = "mark"; b.appendChild(mark);
+      var label = document.createElement("span"); label.textContent = name; b.appendChild(label);
+      if (f.truncated) { var big = document.createElement("span"); big.className = "big"; big.textContent = "too big"; b.appendChild(big); }
+      b.onclick = function(){ syncActiveFromEditor(); active = name; render(); el.editor.focus(); };
+      el.tabs.appendChild(b);
+      tabEls[name] = b;
+    });
+    if (q && shown === 0) {
+      var none = document.createElement("span");
+      none.className = "tab-empty"; none.textContent = "No files match \u201c" + searchQuery.trim() + "\u201d";
+      el.tabs.appendChild(none);
+    }
+    if (!q && canEdit && gistId) {
+      var add = document.createElement("button");
+      add.className = "tab-add"; add.textContent = "+ New file"; add.onclick = addFile;
+      el.tabs.appendChild(add);
+    }
+  }
+
+  function paintHighlight(){
+    var f = active && files[active];
+    var code = f ? el.editor.value : "";
+    var lang = f ? f.lang : "plain";
+    var html = highlight(code, lang);
+    if (code.length === 0 || code.charAt(code.length - 1) === "\n") html += "\n";
+    el.hlCode.innerHTML = html;
+  }
+
+  function renderEditor(canEdit){
+    if (!active || !files[active]) {
+      el.editor.value = ""; el.editor.readOnly = true;
+      el.editor.placeholder = gistId ? "This gist has no files yet." : "Nothing loaded yet.";
+      paintHighlight();
+      return;
+    }
+    var f = files[active];
+    el.editor.value = f.content;
+    el.editor.readOnly = !(canEdit && !f.truncated);
+    el.editor.placeholder = f.truncated ? "This file is too large to edit here safely." : "";
+    el.editor.scrollTop = 0; el.editor.scrollLeft = 0;
+    paintHighlight();
+    el.hl.scrollTop = 0; el.hl.scrollLeft = 0;
+  }
+
+  function syncActiveFromEditor(){
+    if (active && files[active] && !files[active].truncated && !el.editor.readOnly)
+      files[active].content = el.editor.value;
+  }
+
+  // ---------- gist I/O ----------
+  function populateFromGist(data){
+    files = {}; order = []; deleted = [];
+    Object.keys(data.files || {}).forEach(function(n){
+      var gf = data.files[n];
+      files[n] = { content: gf.content || "", truncated: !!gf.truncated, dirty: false, origName: n, lang: pickLang(n) };
+      order.push(n);
+    });
+    active = order.indexOf(active) >= 0 ? active : (order[0] || null);
+    loadedUpdatedAt = data.updated_at;
+  }
+
+  function loadGist(){
+    if (!gistId) return;
+    hideBanner(); loadedUpdatedAt = null; render();
+    fetch(API + "/gists/" + gistId, { headers: headers() })
+      .then(function(r){
+        if (r.status === 404) throw new Error("Gist not found. Check the ID, or add a token if it's a secret gist you don't own.");
+        if (r.status === 403) throw new Error("Rate limited or access denied. Viewing without a token allows 60 requests/hour — try again shortly.");
+        if (!r.ok) throw new Error("GitHub returned " + r.status + ".");
+        return r.json();
+      })
+      .then(function(data){
+        populateFromGist(data);
+        if (order.some(function(n){ return files[n].truncated; }))
+          showBanner("warn", "One or more files are too large to load fully; they're locked to avoid damaging them.");
+        render();
+      })
+      .catch(function(err){ showBanner("warn", err.message); loadedUpdatedAt = null; render(); });
+  }
+
+  function buildPayload(){
+    var payload = {}, empties = [];
+    deleted.forEach(function(od){ payload[od] = null; });
+    order.forEach(function(name){
+      var f = files[name];
+      var renamed = f.origName && f.origName !== name;
+      if (f.truncated) { if (renamed) payload[f.origName] = { filename: name }; return; }
+      if (f.content.length === 0) { empties.push(name); return; }
+      if (renamed) payload[f.origName] = { filename: name, content: f.content };
+      else payload[name] = { content: f.content };
+    });
+    return { payload: payload, empties: empties };
+  }
+
+  function saveGist(){
+    if (!token || !gistId) return;
+    syncActiveFromEditor();
+
+    if (order.length === 0) { showBanner("warn", "A gist must keep at least one file."); return; }
+
+    var built = buildPayload();
+    if (built.empties.length) { showBanner("warn", "GitHub won't store empty files. Add content to: " + built.empties.join(", ") + "."); return; }
+    if (Object.keys(built.payload).length === 0) { showBanner("warn", "Nothing to save."); return; }
+
+    el.saveBtn.disabled = true; el.saveBtn.textContent = "Checking…";
+
+    fetch(API + "/gists/" + gistId, { headers: headers() })
+      .then(function(r){ if (!r.ok) throw new Error("Couldn't check latest (" + r.status + ")."); return r.json(); })
+      .then(function(latest){
+        if (loadedUpdatedAt && latest.updated_at !== loadedUpdatedAt) {
+          var ok = confirm(
+            "This gist changed on another device since you opened it.\n\n" +
+            "OK  = overwrite with THIS laptop's version (their changes are lost)\n" +
+            "Cancel = keep theirs and reload (your unsaved edits here are lost)"
+          );
+          if (!ok) { loadGist(); throw new Error("__reloaded__"); }
+        }
+        el.saveBtn.textContent = "Saving…";
+        return fetch(API + "/gists/" + gistId, {
+          method: "PATCH",
+          headers: headers({ "Content-Type":"application/json" }),
+          body: JSON.stringify({ files: built.payload })
+        });
+      })
+      .then(function(r){
+        if (r.status === 401) throw new Error("Token rejected. It may be expired or missing the gist scope.");
+        if (r.status === 404) throw new Error("Can't write — the token lacks access to this gist (or wrong ID).");
+        if (r.status === 422) throw new Error("GitHub rejected the change (a gist can't be empty or have duplicate names).");
+        if (!r.ok) throw new Error("Save failed (" + r.status + ").");
+        return r.json();
+      })
+      .then(function(data){
+        populateFromGist(data);
+        render();
+        el.saveBtn.className = "primary is-saved"; el.saveBtn.textContent = "Saved ✓"; el.saveBtn.disabled = true;
+        showBanner("ok", "Saved to the gist. Open the link on your other laptop and Reload to pull it.");
+        setTimeout(function(){ if (!anyDirty()) render(); }, 1800);
+      })
+      .catch(function(err){ if (err.message === "__reloaded__") return; showBanner("warn", err.message); render(); });
+  }
+
+  // ---------- file actions ----------
+  function addFile(){
+    var name = prompt("New file name (e.g. notes.py):", "");
+    if (name == null) return;
+    name = name.trim(); if (!name) return;
+    if (files[name]) { showBanner("warn", "A file called " + name + " already exists."); return; }
+    syncActiveFromEditor();
+    files[name] = { content: "", truncated: false, dirty: true, origName: null, lang: detectLang(name) };
+    order.push(name); active = name; hideBanner(); render(); el.editor.focus();
+  }
+
+  function renameFile(){
+    if (!active || !files[active] || !token) return;
+    var nn = prompt("Rename " + active + " to:", active);
+    if (nn == null) return;
+    nn = nn.trim(); if (!nn || nn === active) return;
+    if (files[nn]) { showBanner("warn", "A file called " + nn + " already exists."); return; }
+    syncActiveFromEditor();
+    var f = files[active];
+    var o = loadOverrides();
+    if (o[active] !== undefined) { o[nn] = o[active]; delete o[active]; saveOverrides(o); }
+    delete files[active];
+    var idx = order.indexOf(active); order[idx] = nn;
+    files[nn] = f; f.dirty = true;
+    active = nn; hideBanner(); render();
+  }
+
+  function deleteFile(){
+    if (!active || !files[active] || !token) return;
+    if (order.length <= 1) { showBanner("warn", "Can't delete the last file — a gist needs at least one."); return; }
+    if (!confirm("Delete " + active + "? It's removed from the gist on the next Save.")) return;
+    var f = files[active];
+    if (f.origName) deleted.push(f.origName);
+    var o = loadOverrides(); if (o[active] !== undefined) { delete o[active]; saveOverrides(o); }
+    var idx = order.indexOf(active);
+    delete files[active]; order.splice(idx, 1);
+    active = order[idx] || order[idx - 1] || order[0] || null;
+    hideBanner(); render();
+  }
+
+  function copyRaw(){
+    if (!active || !files[active]) return;
+    var text = files[active].content;
+    function done(){ el.copyBtn.textContent = "Copied ✓"; setTimeout(function(){ el.copyBtn.textContent = "Copy raw"; }, 1400); }
+    function fallback(){
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand("copy"); done(); }
+      catch(e){ showBanner("warn", "Couldn't copy automatically — select the text and copy manually."); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
+    else fallback();
+  }
+
+  function downloadFile(){
+    if (!active || !files[active]) return;
+    syncActiveFromEditor();
+    var blob = new Blob([files[active].content], { type: "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = active;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    el.downloadBtn.textContent = "Saved ✓"; setTimeout(function(){ el.downloadBtn.textContent = "Download"; }, 1400);
+  }
+
+  // ---------- editing ----------
+  function markDirty(){
+    if (!active || !files[active] || el.editor.readOnly) return;
+    files[active].content = el.editor.value;
+    if (!files[active].dirty) files[active].dirty = true;
+    hideBanner();
+    el.saveBtn.disabled = !token;
+    el.stateDot.className = "dot dirty"; el.stateText.textContent = "Unsaved changes";
+    if (tabEls[active]) tabEls[active].classList.add("dirty");
+    paintHighlight();
+  }
+
+  // ---------- token / gist wiring ----------
+  function openTokenPanel(){ var open = el.tokenPanel.classList.toggle("open"); if (open) { el.tokenInput.value = token; el.tokenInput.focus(); } }
+  function saveToken(){
+    token = el.tokenInput.value.trim();
+    if (token) localStorage.setItem(LS_TOKEN, token); else localStorage.removeItem(LS_TOKEN);
+    el.tokenPanel.classList.remove("open"); hideBanner(); render(); if (gistId) loadGist();
+  }
+  function forgetToken(){ token = ""; localStorage.removeItem(LS_TOKEN); el.tokenInput.value = ""; el.tokenPanel.classList.remove("open"); render(); }
+  function useGist(){
+    var id = parseGistId(el.gistInput.value);
+    if (!id) { showBanner("warn", "Paste a gist ID or URL."); return; }
+    gistId = id; localStorage.setItem(LS_GIST, id); setUrlGist(id); loadGist();
+  }
+
+  // ---------- events ----------
+  el.saveBtn.onclick = saveGist;
+  el.reloadBtn.onclick = function(){ if (anyDirty() && !confirm("Reload and discard your unsaved edits on this laptop?")) return; loadGist(); };
+  el.tokenBtn.onclick = openTokenPanel;
+  el.tokenSave.onclick = saveToken;
+  el.tokenForget.onclick = forgetToken;
+  el.gistSave.onclick = useGist;
+  el.gistInput.addEventListener("keydown", function(e){ if (e.key === "Enter") useGist(); });
+  el.copyBtn.onclick = copyRaw;
+  el.downloadBtn.onclick = downloadFile;
+  el.renameBtn.onclick = renameFile;
+  el.deleteBtn.onclick = deleteFile;
+
+  el.fileSearch.addEventListener("input", function(){ searchQuery = el.fileSearch.value; renderTabs(!!token); });
+  el.fileSearch.addEventListener("keydown", function(e){ if (e.key === "Escape") { el.fileSearch.value = ""; searchQuery = ""; renderTabs(!!token); el.fileSearch.blur(); } });
+
+  el.langSelect.onchange = function(){
+    if (!active || !files[active]) return;
+    files[active].lang = el.langSelect.value;
+    var o = loadOverrides(); o[active] = el.langSelect.value; saveOverrides(o);
+    paintHighlight();
+  };
+  el.indentSelect.onchange = function(){ localStorage.setItem(LS_INDENT, el.indentSelect.value); applyEditorPrefs(); };
+  el.wrapToggle.onchange = function(){ localStorage.setItem(LS_WRAP, el.wrapToggle.checked ? "1" : "0"); applyEditorPrefs(); };
+
+  el.editor.addEventListener("input", markDirty);
+  el.editor.addEventListener("scroll", function(){ el.hl.scrollTop = el.editor.scrollTop; el.hl.scrollLeft = el.editor.scrollLeft; });
+  el.editor.addEventListener("keydown", function(e){
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (token) saveGist(); return; }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      var pad = new Array(getIndent() + 1).join(" ");
+      var s = this.selectionStart, en = this.selectionEnd;
+      this.value = this.value.slice(0, s) + pad + this.value.slice(en);
+      this.selectionStart = this.selectionEnd = s + pad.length;
+      markDirty();
+    }
+  });
+  window.addEventListener("beforeunload", function(e){ if (anyDirty()) { e.preventDefault(); e.returnValue = ""; } });
+
+  // ---------- boot ----------
+  (function init(){
+    el.indentSelect.value = String(getIndent());
+    el.wrapToggle.checked = wrapOn();
+    applyEditorPrefs();
+
+    var urlGist = "";
+    try { urlGist = new URL(window.location.href).searchParams.get("gist") || ""; } catch(e){}
+    gistId = parseGistId(urlGist) || localStorage.getItem(LS_GIST) || "";
+    if (gistId) { localStorage.setItem(LS_GIST, gistId); setUrlGist(gistId); }
+    render();
+    if (gistId) loadGist();
+  })();
+})();
+</script>
+</body>
+</html>
